@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Download, FileSpreadsheet, FileJson, Calendar, CheckCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { postsStorage, assetStorage } from "@/lib/storage";
+import type { GeneratedPost, Asset } from "@/types";
 
 const exportFormats = [
   {
@@ -32,26 +34,112 @@ export function ExportPanel() {
   const [selectedFormat, setSelectedFormat] = useState("csv");
   const [isExporting, setIsExporting] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
+  const [posts, setPosts] = useState<GeneratedPost[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+
+  // Load posts and assets on mount
+  useEffect(() => {
+    setPosts(postsStorage.getAll());
+    setAssets(assetStorage.getAll());
+  }, []);
+
+  const escapeCSV = (str: string): string => {
+    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const generateCSV = (): string => {
+    const headers = "Day,Date,Caption,Hook,CTA,Image Prompt,Pillar,Format,Tags";
+    const rows = posts.map((post) =>
+      [
+        post.day,
+        post.date,
+        escapeCSV(post.caption.substring(0, 100) + "..."), // Truncate for preview
+        escapeCSV(post.hook),
+        escapeCSV(post.cta),
+        escapeCSV(post.imagePrompt),
+        post.pillar,
+        post.format,
+        escapeCSV((post.tags || []).join(", ")),
+      ].join(",")
+    );
+    return [headers, ...rows].join("\n");
+  };
+
+  const generateJSON = (): string => {
+    return JSON.stringify(
+      {
+        exportDate: new Date().toISOString(),
+        totalPosts: posts.length,
+        posts: posts,
+        assets: assets.map((a) => ({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          tags: a.tags,
+        })),
+      },
+      null,
+      2
+    );
+  };
+
+  const downloadFile = (content: string, fileName: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const handleExport = async () => {
-    setIsExporting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsExporting(false);
-    setExportComplete(true);
-    toast.success("Export complete! Your file is ready to download.");
-    
-    // Reset after showing success
-    setTimeout(() => setExportComplete(false), 3000);
+    try {
+      setIsExporting(true);
+
+      if (posts.length === 0) {
+        toast.error("No content to export. Generate some posts first!");
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const timestamp = new Date().toISOString().split("T")[0];
+
+      if (selectedFormat === "csv") {
+        const csv = generateCSV();
+        downloadFile(csv, `content-schedule-${timestamp}.csv`, "text/csv");
+      } else if (selectedFormat === "json") {
+        const json = generateJSON();
+        downloadFile(json, `content-schedule-${timestamp}.json`, "application/json");
+      }
+
+      setExportComplete(true);
+      toast.success("Export complete! Your file has been downloaded.");
+
+      // Reset after showing success
+      setTimeout(() => setExportComplete(false), 3000);
+    } catch (error) {
+      console.error("Error exporting:", error);
+      toast.error("Failed to export content");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const generateSampleCSV = () => {
-    const headers = "Day,Date,Caption,Asset Filename,Asset Type,CTA,Tags";
-    const rows = [
-      '1,2026-01-15,"Your resume didn\'t reach a human...",resume_comparison.png,image,"Link in comments","engineer,resume"',
-      '2,2026-01-16,"Watch Data + Skill highlights...",skills_carousel.pdf,carousel,"Last Slide CTA","engineer,skills"',
-      '3,2026-01-17,"Interview prep is everything...",interview_tips.mp4,video,"Follow for more","interview,tips"',
-    ];
-    return [headers, ...rows].join("\n");
+    if (posts.length === 0) {
+      return "Day,Date,Caption,Hook,CTA,Image Prompt,Pillar,Format,Tags\nNo content generated yet. Use the Theme Generator to create posts.";
+    }
+    return generateCSV()
+      .split("\n")
+      .slice(0, 4)
+      .join("\n");
   };
 
   return (
@@ -105,11 +193,13 @@ export function ExportPanel() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="font-medium text-foreground">Content to Export</p>
-                <p className="text-sm text-muted-foreground">28 scheduled posts</p>
+                <p className="text-sm text-muted-foreground">
+                  {posts.length === 0 ? "No posts yet" : `${posts.length} generated post${posts.length !== 1 ? "s" : ""}`}
+                </p>
               </div>
               <div className="flex items-center gap-2 text-primary">
                 <Calendar className="w-5 h-5" />
-                <span className="font-medium">30 days</span>
+                <span className="font-medium">{posts.length} days</span>
               </div>
             </div>
 

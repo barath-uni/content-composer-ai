@@ -1,28 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ImageIcon, FileText, Video, Plus, Search, Filter, Tag } from "lucide-react";
+import { ImageIcon, FileText, Video, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AssetUploader } from "./AssetUploader";
 import { AssetCard } from "./AssetCard";
-
-interface Asset {
-  id: string;
-  name: string;
-  type: "image" | "carousel" | "video";
-  tags: string[];
-  uploadedAt: string;
-  preview?: string;
-}
-
-const mockAssets: Asset[] = [
-  { id: "1", name: "resume_comparison.png", type: "image", tags: ["engineer", "resume"], uploadedAt: "2 hours ago" },
-  { id: "2", name: "skills_carousel.pdf", type: "carousel", tags: ["skills", "ux"], uploadedAt: "1 day ago" },
-  { id: "3", name: "interview_tips.mp4", type: "video", tags: ["interview", "engineer"], uploadedAt: "3 days ago" },
-  { id: "4", name: "ats_breakdown.png", type: "image", tags: ["ATS", "resume"], uploadedAt: "5 days ago" },
-  { id: "5", name: "portfolio_showcase.pdf", type: "carousel", tags: ["portfolio", "ux"], uploadedAt: "1 week ago" },
-  { id: "6", name: "coding_demo.mp4", type: "video", tags: ["coding", "engineer"], uploadedAt: "2 weeks ago" },
-];
+import { assetStorage } from "@/lib/storage";
+import { fileStorage } from "@/lib/fileStorage";
+import type { Asset } from "@/types";
+import { toast } from "sonner";
 
 const bucketTypes = [
   { id: "all", label: "All Assets", icon: null },
@@ -35,7 +21,37 @@ export function AssetBuckets() {
   const [activeType, setActiveType] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showUploader, setShowUploader] = useState(false);
-  const [assets, setAssets] = useState<Asset[]>(mockAssets);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load assets from storage on mount
+  useEffect(() => {
+    loadAssets();
+  }, []);
+
+  const loadAssets = async () => {
+    try {
+      const storedAssets = assetStorage.getAll();
+
+      // Load preview URLs for images
+      const assetsWithPreviews = await Promise.all(
+        storedAssets.map(async (asset) => {
+          if (asset.type === "image" && !asset.preview) {
+            const preview = await fileStorage.getFilePreview(asset.id);
+            return { ...asset, preview: preview || undefined };
+          }
+          return asset;
+        })
+      );
+
+      setAssets(assetsWithPreviews);
+    } catch (error) {
+      console.error("Error loading assets:", error);
+      toast.error("Failed to load assets");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredAssets = assets.filter((asset) => {
     const matchesType = activeType === "all" || asset.type === activeType;
@@ -45,16 +61,65 @@ export function AssetBuckets() {
     return matchesType && matchesSearch;
   });
 
-  const handleUpload = (files: File[], type: string, tags: string[]) => {
-    const newAssets: Asset[] = files.map((file, index) => ({
-      id: `new-${Date.now()}-${index}`,
-      name: file.name,
-      type: type as "image" | "carousel" | "video",
-      tags,
-      uploadedAt: "Just now",
-    }));
-    setAssets([...newAssets, ...assets]);
-    setShowUploader(false);
+  const handleUpload = async (files: File[], type: string, tags: string[]) => {
+    try {
+      const newAssets: Asset[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const assetId = `asset-${Date.now()}-${i}`;
+
+        // Save file to IndexedDB
+        await fileStorage.saveFile(assetId, file);
+
+        // Get preview for images
+        let preview: string | undefined;
+        if (type === "image") {
+          preview = await fileStorage.getFilePreview(assetId) || undefined;
+        }
+
+        // Create asset metadata
+        const asset: Asset = {
+          id: assetId,
+          name: file.name,
+          type: type as "image" | "carousel" | "video",
+          tags,
+          uploadedAt: new Date().toLocaleString(),
+          size: file.size,
+          mimeType: file.type,
+          preview,
+        };
+
+        // Save to localStorage
+        assetStorage.add(asset);
+        newAssets.push(asset);
+      }
+
+      // Update UI
+      setAssets([...newAssets, ...assets]);
+      setShowUploader(false);
+      toast.success(`Successfully uploaded ${files.length} file(s)`);
+    } catch (error) {
+      console.error("Error uploading assets:", error);
+      toast.error("Failed to upload some files");
+    }
+  };
+
+  const handleDeleteAsset = async (assetId: string) => {
+    try {
+      // Delete from IndexedDB
+      await fileStorage.deleteFile(assetId);
+
+      // Delete from localStorage
+      assetStorage.delete(assetId);
+
+      // Update UI
+      setAssets(assets.filter((a) => a.id !== assetId));
+      toast.success("Asset deleted successfully");
+    } catch (error) {
+      console.error("Error deleting asset:", error);
+      toast.error("Failed to delete asset");
+    }
   };
 
   return (
@@ -127,7 +192,12 @@ export function AssetBuckets() {
       >
         <AnimatePresence mode="popLayout">
           {filteredAssets.map((asset, index) => (
-            <AssetCard key={asset.id} asset={asset} index={index} />
+            <AssetCard
+              key={asset.id}
+              asset={asset}
+              index={index}
+              onDelete={handleDeleteAsset}
+            />
           ))}
         </AnimatePresence>
       </motion.div>

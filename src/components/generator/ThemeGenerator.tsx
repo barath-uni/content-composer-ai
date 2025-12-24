@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Target, Users, Palette, Volume2, Calendar, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GeneratedContent } from "./GeneratedContent";
+import { themeStorage, postsStorage } from "@/lib/storage";
+import type { GeneratedPost } from "@/types";
+import { toast } from "sonner";
 
 const contentPillars = [
   { id: "problem", label: "Problem", description: "Pain points & challenges" },
@@ -41,7 +44,23 @@ export function ThemeGenerator() {
   const [selectedTone, setSelectedTone] = useState("professional");
   const [daysToFill, setDaysToFill] = useState(7);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState<any[]>([]);
+  const [generatedContent, setGeneratedContent] = useState<GeneratedPost[]>([]);
+
+  // Load saved theme settings on mount
+  useEffect(() => {
+    const savedTheme = themeStorage.get();
+    if (savedTheme) {
+      setSelectedPillars(savedTheme.pillars);
+      setSelectedAudience(savedTheme.audience);
+      setSelectedFormat(savedTheme.format);
+      setSelectedTone(savedTheme.tone);
+      setDaysToFill(savedTheme.daysToFill);
+    }
+
+    // Load previously generated content
+    const savedPosts = postsStorage.getAll();
+    setGeneratedContent(savedPosts);
+  }, []);
 
   const togglePillar = (id: string) => {
     setSelectedPillars((prev) =>
@@ -50,24 +69,46 @@ export function ThemeGenerator() {
   };
 
   const handleGenerate = async () => {
-    setIsGenerating(true);
-    // Simulate AI generation
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    
-    const mockContent = Array.from({ length: daysToFill }, (_, i) => ({
-      id: `content-${i + 1}`,
-      day: i + 1,
-      date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      caption: `Your resume didn't reach a human.\n\nHere's why 70% of resumes never make it past the ATS.\n\nMost applicants don't realize that:\n→ Keywords matter more than you think\n→ Formatting can break parsing\n→ Simple changes can double your callbacks\n\nI've reviewed 1,000+ resumes.\nHere's what actually works:\n\n[Thread continues...]`,
-      hook: "Your resume didn't reach a human.",
-      cta: "Follow for more resume tips!",
-      imagePrompt: "Split-screen comparison showing a rejected resume on left (red X) vs an optimized resume on right (green check), modern minimal design",
-      pillar: contentPillars[i % contentPillars.length].label,
-      format: selectedFormat,
-    }));
-    
-    setGeneratedContent(mockContent);
-    setIsGenerating(false);
+    try {
+      setIsGenerating(true);
+
+      // Save theme settings
+      themeStorage.save({
+        pillars: selectedPillars,
+        audience: selectedAudience,
+        format: selectedFormat,
+        tone: selectedTone,
+        daysToFill,
+      });
+
+      // Simulate AI generation (in real implementation, this would call an AI API)
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const mockContent: GeneratedPost[] = Array.from({ length: daysToFill }, (_, i) => ({
+        id: `post-${Date.now()}-${i}`,
+        day: i + 1,
+        date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toLocaleDateString(),
+        caption: `Your resume didn't reach a human.\n\nHere's why 70% of resumes never make it past the ATS.\n\nMost applicants don't realize that:\n→ Keywords matter more than you think\n→ Formatting can break parsing\n→ Simple changes can double your callbacks\n\nI've reviewed 1,000+ resumes.\nHere's what actually works:\n\n[Thread continues...]`,
+        hook: "Your resume didn't reach a human.",
+        cta: "Follow for more resume tips!",
+        imagePrompt: "Split-screen comparison showing a rejected resume on left (red X) vs an optimized resume on right (green check), modern minimal design",
+        pillar: contentPillars[i % contentPillars.length].label,
+        format: selectedFormat,
+        tags: selectedPillars,
+      }));
+
+      // Clear previous posts and save new ones
+      postsStorage.clear();
+      postsStorage.addBatch(mockContent);
+
+      setGeneratedContent(mockContent);
+      toast.success(`Successfully generated ${daysToFill} posts!`);
+    } catch (error) {
+      console.error("Error generating content:", error);
+      toast.error("Failed to generate content");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (

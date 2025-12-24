@@ -1,19 +1,12 @@
 import { motion } from "framer-motion";
 import { ImageIcon, FileText, Video, MoreVertical, Tag, Trash2, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface Asset {
-  id: string;
-  name: string;
-  type: "image" | "carousel" | "video";
-  tags: string[];
-  uploadedAt: string;
-  preview?: string;
-}
+import type { Asset } from "@/types";
 
 interface AssetCardProps {
   asset: Asset;
   index: number;
+  onDelete?: (id: string) => void;
 }
 
 const typeConfig = {
@@ -22,9 +15,16 @@ const typeConfig = {
   video: { icon: Video, color: "text-pink-400", bg: "bg-pink-400/10", gradient: "from-pink-500/20 to-pink-600/10" },
 };
 
-export function AssetCard({ asset, index }: AssetCardProps) {
+export function AssetCard({ asset, index, onDelete }: AssetCardProps) {
   const config = typeConfig[asset.type];
   const Icon = config.icon;
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete && confirm(`Delete ${asset.name}?`)) {
+      onDelete(asset.id);
+    }
+  };
 
   return (
     <motion.div
@@ -40,14 +40,21 @@ export function AssetCard({ asset, index }: AssetCardProps) {
         "h-40 flex items-center justify-center relative",
         `bg-gradient-to-br ${config.gradient}`
       )}>
-        <Icon className={cn("w-16 h-16", config.color)} />
-        
+        {asset.preview ? (
+          <img src={asset.preview} alt={asset.name} className="w-full h-full object-cover" />
+        ) : (
+          <Icon className={cn("w-16 h-16", config.color)} />
+        )}
+
         {/* Hover Actions */}
         <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
           <button className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors">
             <Edit className="w-5 h-5 text-foreground" />
           </button>
-          <button className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors">
+          <button
+            onClick={handleDelete}
+            className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors"
+          >
             <Trash2 className="w-5 h-5 text-foreground" />
           </button>
         </div>
