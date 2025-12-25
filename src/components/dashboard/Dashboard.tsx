@@ -1,18 +1,46 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { 
-  ImageIcon, 
-  FileText, 
-  Video, 
+import {
+  ImageIcon,
+  FileText,
+  Video,
   Calendar,
-  TrendingUp,
-  Eye,
-  MousePointer
+  Zap
 } from "lucide-react";
 import { StatsCard } from "./StatsCard";
 import { RecentActivity } from "./RecentActivity";
 import { UpcomingPosts } from "./UpcomingPosts";
+import { assetStorage, postsStorage, scheduledPostsStorage } from "@/lib/storage";
 
 export function Dashboard() {
+  const [stats, setStats] = useState({
+    totalAssets: 0,
+    images: 0,
+    carousels: 0,
+    videos: 0,
+    generatedPosts: 0,
+    scheduledPosts: 0,
+  });
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = () => {
+    const assets = assetStorage.getAll();
+    const posts = postsStorage.getAll();
+    const scheduled = scheduledPostsStorage.getAll();
+
+    setStats({
+      totalAssets: assets.length,
+      images: assets.filter(a => a.type === "image").length,
+      carousels: assets.filter(a => a.type === "carousel").length,
+      videos: assets.filter(a => a.type === "video").length,
+      generatedPosts: posts.length,
+      scheduledPosts: scheduled.filter(s => s.status === "scheduled").length,
+    });
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -29,34 +57,34 @@ export function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Total Assets"
-          value={47}
-          change="+12 this week"
-          changeType="positive"
+          value={stats.totalAssets}
+          change={stats.totalAssets === 0 ? "Upload your first asset" : `${stats.images + stats.carousels + stats.videos} total`}
+          changeType={stats.totalAssets > 0 ? "positive" : "neutral"}
           icon={ImageIcon}
           delay={0.1}
         />
         <StatsCard
-          title="Scheduled Posts"
-          value={28}
-          change="Next 30 days"
-          changeType="neutral"
-          icon={Calendar}
+          title="Generated Posts"
+          value={stats.generatedPosts}
+          change={stats.generatedPosts === 0 ? "Generate content to start" : "Ready to export"}
+          changeType={stats.generatedPosts > 0 ? "positive" : "neutral"}
+          icon={Zap}
           delay={0.2}
         />
         <StatsCard
-          title="Avg. Impressions"
-          value="12.4K"
-          change="+18% vs last month"
-          changeType="positive"
-          icon={Eye}
+          title="Scheduled Posts"
+          value={stats.scheduledPosts}
+          change={stats.scheduledPosts === 0 ? "No scheduled posts" : "Coming up"}
+          changeType={stats.scheduledPosts > 0 ? "positive" : "neutral"}
+          icon={Calendar}
           delay={0.3}
         />
         <StatsCard
-          title="Avg. CTR"
-          value="3.2%"
-          change="+0.4% vs last month"
-          changeType="positive"
-          icon={MousePointer}
+          title="Asset Types"
+          value={stats.images + stats.carousels + stats.videos > 0 ? "3" : "0"}
+          change={`${stats.images}/${stats.carousels}/${stats.videos} split`}
+          changeType="neutral"
+          icon={FileText}
           delay={0.4}
         />
       </div>
@@ -70,24 +98,24 @@ export function Dashboard() {
       >
         <h2 className="text-xl font-display font-semibold text-foreground mb-6">Asset Distribution</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <AssetTypeCard 
-            icon={ImageIcon} 
-            type="Images" 
-            count={24} 
+          <AssetTypeCard
+            icon={ImageIcon}
+            type="Images"
+            count={stats.images}
             color="text-cyan-400"
             bgColor="bg-cyan-400/10"
           />
-          <AssetTypeCard 
-            icon={FileText} 
-            type="Carousels" 
-            count={15} 
+          <AssetTypeCard
+            icon={FileText}
+            type="Carousels"
+            count={stats.carousels}
             color="text-purple-400"
             bgColor="bg-purple-400/10"
           />
-          <AssetTypeCard 
-            icon={Video} 
-            type="Videos" 
-            count={8} 
+          <AssetTypeCard
+            icon={Video}
+            type="Videos"
+            count={stats.videos}
             color="text-pink-400"
             bgColor="bg-pink-400/10"
           />

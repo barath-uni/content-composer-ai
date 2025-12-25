@@ -1,37 +1,60 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Calendar, ChevronLeft, ChevronRight, Plus, ImageIcon, FileText, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { postsStorage, scheduledPostsStorage } from "@/lib/storage";
+import type { GeneratedPost } from "@/types";
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-interface ScheduledPost {
+interface CalendarPost {
   id: string;
   title: string;
-  type: "image" | "carousel" | "video";
-  time: string;
+  type: "image" | "carousel" | "video" | "text";
+  time?: string;
 }
-
-const mockSchedule: Record<string, ScheduledPost[]> = {
-  "2026-01-15": [{ id: "1", title: "Resume tips", type: "image", time: "9:00 AM" }],
-  "2026-01-16": [{ id: "2", title: "ATS breakdown", type: "carousel", time: "10:00 AM" }],
-  "2026-01-17": [{ id: "3", title: "Interview prep", type: "video", time: "11:00 AM" }],
-  "2026-01-20": [
-    { id: "4", title: "Skills showcase", type: "image", time: "9:00 AM" },
-    { id: "5", title: "Portfolio tips", type: "carousel", time: "2:00 PM" },
-  ],
-  "2026-01-22": [{ id: "6", title: "Career growth", type: "image", time: "10:00 AM" }],
-  "2026-01-25": [{ id: "7", title: "Networking guide", type: "carousel", time: "9:00 AM" }],
-};
 
 const typeConfig = {
   image: { icon: ImageIcon, color: "bg-cyan-400/20 text-cyan-400" },
   carousel: { icon: FileText, color: "bg-purple-400/20 text-purple-400" },
   video: { icon: Video, color: "bg-pink-400/20 text-pink-400" },
+  text: { icon: FileText, color: "bg-amber-400/20 text-amber-400" },
 };
 
 export function ContentPlanner() {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 1)); // January 2026
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [schedule, setSchedule] = useState<Record<string, CalendarPost[]>>({});
+
+  useEffect(() => {
+    loadSchedule();
+  }, []);
+
+  const loadSchedule = () => {
+    const posts = postsStorage.getAll();
+    const scheduled = scheduledPostsStorage.getAll();
+
+    // Create a map of date -> posts
+    const scheduleMap: Record<string, CalendarPost[]> = {};
+
+    // Add all generated posts with their dates
+    posts.forEach((post) => {
+      const schedInfo = scheduled.find((s) => s.postId === post.id);
+      const dateKey = schedInfo?.scheduledDate || post.date;
+
+      if (!scheduleMap[dateKey]) {
+        scheduleMap[dateKey] = [];
+      }
+
+      scheduleMap[dateKey].push({
+        id: post.id,
+        title: post.hook,
+        type: post.format as CalendarPost["type"],
+        time: schedInfo?.scheduledDate ? new Date(schedInfo.scheduledDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : undefined,
+      });
+    });
+
+    setSchedule(scheduleMap);
+  };
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -69,8 +92,11 @@ export function ContentPlanner() {
     // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const dateKey = formatDateKey(day);
-      const posts = mockSchedule[dateKey] || [];
-      const isToday = day === 15 && currentDate.getMonth() === 0; // Mock "today"
+      const posts = schedule[dateKey] || [];
+      const today = new Date();
+      const isToday = day === today.getDate() &&
+                      currentDate.getMonth() === today.getMonth() &&
+                      currentDate.getFullYear() === today.getFullYear();
 
       days.push(
         <motion.div
