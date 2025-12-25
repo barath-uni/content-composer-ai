@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LocalStorage Debug</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        button { padding: 10px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>LocalStorage Inspector</h1>
+
+    <button onclick="showAll()">Show All Storage</button>
+    <button onclick="showPosts()">Show Posts</button>
+    <button onclick="showScheduled()">Show Scheduled Posts</button>
+    <button onclick="clearAll()">Clear All</button>
+
+    <div id="output"></div>
+
+    <script>
+        function showAll() {
+            const output = document.getElementById('output');
+            let html = '<div class="section"><h2>All LocalStorage Keys:</h2>';
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                html += `<h3>${key}</h3>`;
+                html += `<pre>${value}</pre>`;
+            }
+
+            html += '</div>';
+            output.innerHTML = html;
+        }
+
+        function showPosts() {
+            const output = document.getElementById('output');
+            const posts = localStorage.getItem('content-composer-generated-posts');
+
+            if (posts) {
+                const parsed = JSON.parse(posts);
+                output.innerHTML = `
+                    <div class="section">
+                        <h2>Generated Posts (${parsed.length} total)</h2>
+                        <pre>${JSON.stringify(parsed, null, 2)}</pre>
+                    </div>
+                `;
+            } else {
+                output.innerHTML = '<div class="section"><h2>No posts found!</h2></div>';
+            }
+        }
+
+        function showScheduled() {
+            const output = document.getElementById('output');
+            const scheduled = localStorage.getItem('content-composer-scheduled-posts');
+
+            if (scheduled) {
+                const parsed = JSON.parse(scheduled);
+                output.innerHTML = `
+                    <div class="section">
+                        <h2>Scheduled Posts (${parsed.length} total)</h2>
+                        <pre>${JSON.stringify(parsed, null, 2)}</pre>
+                    </div>
+                `;
+            } else {
+                output.innerHTML = '<div class="section"><h2>No scheduled posts found!</h2></div>';
+            }
+        }
+
+        function clearAll() {
+            if (confirm('Clear all localStorage?')) {
+                localStorage.clear();
+                alert('Cleared!');
+                showAll();
+            }
+        }
+
+        // Auto-load on page load
+        showAll();
+    </script>
+</body>
+</html>

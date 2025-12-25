@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkedIn Auto Scheduler</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>LinkedIn Auto Scheduler</h1>
+      <p class="subtitle">Schedule posts from Content Composer AI</p>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel">
+      <div class="setting-row">
+        <label for="daysAhead">Days to schedule:</label>
+        <input type="number" id="daysAhead" min="1" max="30" value="7">
+      </div>
+      <div class="setting-row">
+        <label for="delayBetween">Delay between posts (seconds):</label>
+        <input type="number" id="delayBetween" min="5" max="60" value="10">
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-number" id="totalPosts">0</div>
+        <div class="stat-label">Total Posts</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="pendingPosts">0</div>
+        <div class="stat-label">Pending</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="scheduledPosts">0</div>
+        <div class="stat-label">Scheduled</div>
+      </div>
+    </div>
+
+    <!-- Posts List -->
+    <div class="posts-section">
+      <h3>Posts to Schedule</h3>
+      <div id="postsList" class="posts-list">
+        <!-- Will be populated by JavaScript -->
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="actions">
+      <button id="refreshBtn" class="btn btn-secondary">
+        <span>🔄</span> Refresh
+      </button>
+      <button id="scheduleBtn" class="btn btn-primary">
+        <span>📅</span> Schedule All
+      </button>
+    </div>
+
+    <!-- Status Log -->
+    <div class="status-section">
+      <h3>Status</h3>
+      <div id="statusLog" class="status-log">
+        <p class="status-message">Ready to schedule posts</p>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div id="progressBar" class="progress-bar hidden">
+      <div class="progress-fill" id="progressFill"></div>
+      <span class="progress-text" id="progressText">0%</span>
+    </div>
+  </div>
+
+  <script src="storage-reader.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { Download, FileSpreadsheet, FileJson, Calendar, CheckCircle, ExternalLin
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { postsStorage, assetStorage } from "@/lib/storage";
+import { formatForLinkedIn } from "@/lib/linkedinFormatter";
 import type { GeneratedPost, Asset } from "@/types";
 
 const exportFormats = [
@@ -51,20 +52,25 @@ export function ExportPanel() {
   };
 
   const generateCSV = (): string => {
-    const headers = "Day,Date,Caption,Hook,CTA,Image Prompt,Pillar,Format,Tags";
-    const rows = posts.map((post) =>
-      [
+    const headers = "Day,Date,Caption (LinkedIn Formatted),Hook,CTA,Image Prompt,Pillar,Format,Asset ID,Tags,Time";
+    const rows = posts.map((post) => {
+      // Format caption for LinkedIn
+      const linkedinCaption = formatForLinkedIn(post.caption);
+
+      return [
         post.day,
         post.date,
-        escapeCSV(post.caption.substring(0, 100) + "..."), // Truncate for preview
+        escapeCSV(linkedinCaption), // Full caption with LinkedIn formatting
         escapeCSV(post.hook),
         escapeCSV(post.cta),
         escapeCSV(post.imagePrompt),
         post.pillar,
         post.format,
+        post.assetId || "",
         escapeCSV((post.tags || []).join(", ")),
-      ].join(",")
-    );
+        "09:00 AM", // Default time, can be customized
+      ].join(",");
+    });
     return [headers, ...rows].join("\n");
   };
 

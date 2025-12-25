@@ -1,11 +1,15 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Target, Users, Palette, Volume2, Calendar, Zap } from "lucide-react";
+import { Sparkles, Target, Users, Palette, Volume2, Calendar, Zap, Settings, Upload, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GeneratedContent } from "./GeneratedContent";
-import { themeStorage, postsStorage } from "@/lib/storage";
+import { ExcelUploader } from "./ExcelUploader";
+import { themeStorage, postsStorage, assetStorage } from "@/lib/storage";
+import { generateContent, isAIConfigured } from "@/lib/aiService";
 import type { GeneratedPost } from "@/types";
 import { toast } from "sonner";
+import { APIKeyDialog } from "./APIKeyDialog";
 
 const contentPillars = [
   { id: "problem", label: "Problem", description: "Pain points & challenges" },
@@ -45,6 +49,9 @@ export function ThemeGenerator() {
   const [daysToFill, setDaysToFill] = useState(7);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedPost[]>([]);
+  const [showAPIKeyDialog, setShowAPIKeyDialog] = useState(false);
+  const [useAI, setUseAI] = useState(false);
+  const [generationMode, setGenerationMode] = useState<"ai" | "excel">("excel");
 
   // Load saved theme settings on mount
   useEffect(() => {
@@ -60,6 +67,9 @@ export function ThemeGenerator() {
     // Load previously generated content
     const savedPosts = postsStorage.getAll();
     setGeneratedContent(savedPosts);
+
+    // Check if AI is configured
+    setUseAI(isAIConfigured());
   }, []);
 
   const togglePillar = (id: string) => {
@@ -73,42 +83,69 @@ export function ThemeGenerator() {
       setIsGenerating(true);
 
       // Save theme settings
-      themeStorage.save({
+      const theme = {
         pillars: selectedPillars,
         audience: selectedAudience,
         format: selectedFormat,
         tone: selectedTone,
         daysToFill,
-      });
+      };
+      themeStorage.save(theme);
 
-      // Simulate AI generation (in real implementation, this would call an AI API)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      let newContent: GeneratedPost[];
 
-      const mockContent: GeneratedPost[] = Array.from({ length: daysToFill }, (_, i) => ({
-        id: `post-${Date.now()}-${i}`,
-        day: i + 1,
-        date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        caption: `Your resume didn't reach a human.\n\nHere's why 70% of resumes never make it past the ATS.\n\nMost applicants don't realize that:\n→ Keywords matter more than you think\n→ Formatting can break parsing\n→ Simple changes can double your callbacks\n\nI've reviewed 1,000+ resumes.\nHere's what actually works:\n\n[Thread continues...]`,
-        hook: "Your resume didn't reach a human.",
-        cta: "Follow for more resume tips!",
-        imagePrompt: "Split-screen comparison showing a rejected resume on left (red X) vs an optimized resume on right (green check), modern minimal design",
-        pillar: contentPillars[i % contentPillars.length].label,
-        format: selectedFormat,
-        tags: selectedPillars,
-      }));
+      if (useAI && isAIConfigured()) {
+        // Use real AI generation
+        try {
+          const assets = assetStorage.getAll();
+          newContent = await generateContent({
+            theme,
+            availableAssets: assets,
+            startDate: new Date(),
+          });
+          toast.success(`AI generated ${daysToFill} posts!`);
+        } catch (error: any) {
+          console.error("AI generation error:", error);
+          if (error.message?.includes("API key")) {
+            toast.error("API key not configured. Using mock data.");
+            newContent = generateMockContent();
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        // Use mock generation
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        newContent = generateMockContent();
+        toast.success(`Generated ${daysToFill} mock posts!`);
+      }
 
       // Clear previous posts and save new ones
       postsStorage.clear();
-      postsStorage.addBatch(mockContent);
+      postsStorage.addBatch(newContent);
 
-      setGeneratedContent(mockContent);
-      toast.success(`Successfully generated ${daysToFill} posts!`);
+      setGeneratedContent(newContent);
     } catch (error) {
       console.error("Error generating content:", error);
       toast.error("Failed to generate content");
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const generateMockContent = (): GeneratedPost[] => {
+    return Array.from({ length: daysToFill }, (_, i) => ({
+      id: `post-${Date.now()}-${i}`,
+      day: i + 1,
+      date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      caption: `Your resume didn't reach a human.\n\nHere's why 70% of resumes never make it past the ATS.\n\nMost applicants don't realize that:\n→ Keywords matter more than you think\n→ Formatting can break parsing\n→ Simple changes can double your callbacks\n\nI've reviewed 1,000+ resumes.\nHere's what actually works:\n\n[Thread continues...]`,
+      hook: "Your resume didn't reach a human.",
+      cta: "Follow for more resume tips!",
+      imagePrompt: "Split-screen comparison showing a rejected resume on left (red X) vs an optimized resume on right (green check), modern minimal design",
+      pillar: contentPillars[i % contentPillars.length].label,
+      format: selectedFormat,
+      tags: selectedPillars,
+    }));
   };
 
   return (
@@ -118,14 +155,77 @@ export function ThemeGenerator() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
+        className="flex items-start justify-between"
       >
-        <h1 className="text-3xl font-display font-bold text-foreground">Theme Generator</h1>
-        <p className="text-muted-foreground mt-2">Configure your content strategy and generate AI-powered posts</p>
+        <div>
+          <h1 className="text-3xl font-display font-bold text-foreground">Theme Generator</h1>
+          <p className="text-muted-foreground mt-2">Configure your content strategy and generate AI-powered posts</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAPIKeyDialog(true)}
+          >
+            <Settings className="w-4 h-4" />
+            {useAI ? "AI Configured" : "Configure AI"}
+          </Button>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary">
+            <Sparkles className={`w-4 h-4 ${useAI ? "text-primary" : "text-muted-foreground"}`} />
+            <label className="text-sm font-medium cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useAI}
+                onChange={(e) => setUseAI(e.target.checked)}
+                className="mr-2"
+                disabled={!isAIConfigured()}
+              />
+              Use AI
+            </label>
+          </div>
+        </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Configuration Panel */}
-        <div className="lg:col-span-1 space-y-6">
+      <APIKeyDialog
+        open={showAPIKeyDialog}
+        onOpenChange={setShowAPIKeyDialog}
+        onSave={() => setUseAI(isAIConfigured())}
+      />
+
+      {/* Generation Mode Tabs */}
+      <Tabs value={generationMode} onValueChange={(v) => setGenerationMode(v as "ai" | "excel")}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="excel" className="flex items-center gap-2">
+            <Upload className="w-4 h-4" />
+            Upload from Excel
+          </TabsTrigger>
+          <TabsTrigger value="ai" className="flex items-center gap-2">
+            <Wand2 className="w-4 h-4" />
+            Generate with AI
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Excel Upload Tab */}
+        <TabsContent value="excel" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1">
+              <ExcelUploader onUploadComplete={setGeneratedContent} />
+            </div>
+            <div className="lg:col-span-2">
+              <GeneratedContent
+                content={generatedContent}
+                isLoading={false}
+                onUpdate={setGeneratedContent}
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* AI Generation Tab */}
+        <TabsContent value="ai" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Configuration Panel */}
+            <div className="lg:col-span-1 space-y-6">
           {/* Content Pillars */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -293,11 +393,17 @@ export function ThemeGenerator() {
           </motion.div>
         </div>
 
-        {/* Generated Content Preview */}
-        <div className="lg:col-span-2">
-          <GeneratedContent content={generatedContent} isLoading={isGenerating} />
-        </div>
-      </div>
+            {/* Generated Content Preview */}
+            <div className="lg:col-span-2">
+              <GeneratedContent
+                content={generatedContent}
+                isLoading={isGenerating}
+                onUpdate={setGeneratedContent}
+              />
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

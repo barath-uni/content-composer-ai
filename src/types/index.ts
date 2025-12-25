@@ -24,6 +24,7 @@ export interface GeneratedPost {
   format: string;
   assetId?: string; // Reference to asset if using one
   tags?: string[];
+  status?: "pending" | "accepted" | "rejected"; // For review workflow
 }
 
 export interface ContentTheme {
@@ -38,7 +39,7 @@ export interface ScheduledPost {
   id: string;
   postId: string; // Reference to GeneratedPost
   scheduledDate: string;
-  status: "draft" | "scheduled" | "published";
+  status: "draft" | "scheduled" | "published" | "linkedin_scheduled";
   platform?: string;
 }
 

@@ -1,29 +1,58 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calendar, Copy, Edit, Sparkles } from "lucide-react";
+import { Calendar, Copy, Edit, Sparkles, Clock, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-
-interface ContentItem {
-  id: string;
-  day: number;
-  date: string;
-  caption: string;
-  hook: string;
-  cta: string;
-  imagePrompt: string;
-  pillar: string;
-  format: string;
-}
+import { PostEditor } from "./PostEditor";
+import { ScheduleDialog } from "../planner/ScheduleDialog";
+import { copyToClipboardForLinkedIn } from "@/lib/linkedinFormatter";
+import { postsStorage } from "@/lib/storage";
+import type { GeneratedPost } from "@/types";
 
 interface GeneratedContentProps {
-  content: ContentItem[];
+  content: GeneratedPost[];
   isLoading: boolean;
+  onUpdate?: (updatedPosts: GeneratedPost[]) => void;
 }
 
-export function GeneratedContent({ content, isLoading }: GeneratedContentProps) {
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard!");
+export function GeneratedContent({ content, isLoading, onUpdate }: GeneratedContentProps) {
+  const [editingPost, setEditingPost] = useState<GeneratedPost | null>(null);
+  const [schedulingPost, setSchedulingPost] = useState<GeneratedPost | null>(null);
+
+  const copyToClipboard = async (text: string) => {
+    const success = await copyToClipboardForLinkedIn(text);
+    if (success) {
+      toast.success("Copied with LinkedIn formatting!");
+    } else {
+      toast.error("Failed to copy");
+    }
+  };
+
+  const handlePostUpdate = (updatedPost: GeneratedPost) => {
+    const updatedContent = content.map(post =>
+      post.id === updatedPost.id ? updatedPost : post
+    );
+    onUpdate?.(updatedContent);
+  };
+
+  const handleAccept = (post: GeneratedPost) => {
+    const updated = { ...post, status: "accepted" as const };
+    postsStorage.update(post.id, updated);
+    handlePostUpdate(updated);
+    toast.success("Post accepted!");
+  };
+
+  const handleReject = (post: GeneratedPost) => {
+    const updated = { ...post, status: "rejected" as const };
+    postsStorage.update(post.id, updated);
+    handlePostUpdate(updated);
+    toast.success("Post rejected");
+  };
+
+  const handleScheduled = () => {
+    // Trigger a custom event to notify ContentPlanner to refresh
+    window.dispatchEvent(new CustomEvent('posts-scheduled'));
+    toast.success("Post scheduled! View in Content Planner.");
   };
 
   if (isLoading) {
@@ -124,32 +153,99 @@ export function GeneratedContent({ content, isLoading }: GeneratedContentProps) 
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(item.caption)}
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy Caption
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(item.imagePrompt)}
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy Prompt
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </Button>
+              <div className="space-y-2">
+                {/* Accept/Reject Row */}
+                {item.status !== "accepted" && item.status !== "rejected" && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 border-green-500/50 hover:bg-green-500/10"
+                      onClick={() => handleAccept(item)}
+                    >
+                      <Check className="w-4 h-4 text-green-500" />
+                      Accept
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 border-red-500/50 hover:bg-red-500/10"
+                      onClick={() => handleReject(item)}
+                    >
+                      <X className="w-4 h-4 text-red-500" />
+                      Reject
+                    </Button>
+                  </div>
+                )}
+
+                {/* Status Badge */}
+                {item.status === "accepted" && (
+                  <div className="px-3 py-1 rounded bg-green-500/10 border border-green-500/20 text-center">
+                    <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                      ✓ Accepted
+                    </span>
+                  </div>
+                )}
+                {item.status === "rejected" && (
+                  <div className="px-3 py-1 rounded bg-red-500/10 border border-red-500/20 text-center">
+                    <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                      ✗ Rejected
+                    </span>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(item.caption)}
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingPost(item)}
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit
+                  </Button>
+                  {item.status === "accepted" && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setSchedulingPost(item)}
+                    >
+                      <Clock className="w-4 h-4" />
+                      Schedule
+                    </Button>
+                  )}
+                </div>
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
+
+      {editingPost && (
+        <PostEditor
+          post={editingPost}
+          open={!!editingPost}
+          onOpenChange={(open) => !open && setEditingPost(null)}
+          onSave={handlePostUpdate}
+        />
+      )}
+
+      {schedulingPost && (
+        <ScheduleDialog
+          post={schedulingPost}
+          open={!!schedulingPost}
+          onOpenChange={(open) => !open && setSchedulingPost(null)}
+          onScheduled={handleScheduled}
+        />
+      )}
     </div>
   );
 }

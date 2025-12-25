@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkedIn Content Helper</title>
+  <link rel="stylesheet" href="styles-simple.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>📅 LinkedIn Content Helper</h1>
+      <p class="subtitle">Quick copy & paste for manual scheduling</p>
+    </div>
+
+    <!-- Settings -->
+    <div class="settings">
+      <label>
+        Show next
+        <input type="number" id="daysAhead" min="1" max="30" value="7" style="width: 50px;">
+        days
+      </label>
+      <button id="refreshBtn" class="btn-small">🔄 Refresh</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat">
+        <span class="stat-num" id="totalPosts">0</span>
+        <span class="stat-label">Total</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" id="pendingPosts">0</span>
+        <span class="stat-label">Pending</span>
+      </div>
+    </div>
+
+    <!-- Posts List -->
+    <div id="postsList" class="posts-list">
+      <!-- Will be populated by JavaScript -->
+    </div>
+
+    <!-- Status -->
+    <div id="status" class="status hidden"></div>
+  </div>
+
+  <script src="popup-simple.js"></script>
+</body>
+</html>

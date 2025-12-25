@@ -26,12 +26,32 @@ export function ContentPlanner() {
   const [schedule, setSchedule] = useState<Record<string, CalendarPost[]>>({});
 
   useEffect(() => {
+    console.log('ContentPlanner mounted - loading initial schedule');
     loadSchedule();
+
+    // Listen for schedule updates
+    const handleScheduleUpdate = () => {
+      console.log('=== POSTS-SCHEDULED EVENT RECEIVED ===');
+      console.log('Reloading schedule from storage...');
+      loadSchedule();
+    };
+
+    window.addEventListener('posts-scheduled', handleScheduleUpdate);
+    console.log('Event listener added for posts-scheduled');
+
+    return () => {
+      window.removeEventListener('posts-scheduled', handleScheduleUpdate);
+    };
   }, []);
 
   const loadSchedule = () => {
+    console.log('=== LOADING SCHEDULE ===');
     const posts = postsStorage.getAll();
     const scheduled = scheduledPostsStorage.getAll();
+
+    console.log('Generated posts from storage:', posts.length);
+    console.log('Scheduled posts from storage:', scheduled.length);
+    console.log('Scheduled posts data:', scheduled);
 
     // Create a map of date -> posts
     const scheduleMap: Record<string, CalendarPost[]> = {};
@@ -39,7 +59,20 @@ export function ContentPlanner() {
     // Add all generated posts with their dates
     posts.forEach((post) => {
       const schedInfo = scheduled.find((s) => s.postId === post.id);
-      const dateKey = schedInfo?.scheduledDate || post.date;
+
+      // Convert scheduledDate ISO string to YYYY-MM-DD format to match calendar keys
+      let dateKey: string;
+      if (schedInfo?.scheduledDate) {
+        const schedDate = new Date(schedInfo.scheduledDate);
+        const year = schedDate.getFullYear();
+        const month = String(schedDate.getMonth() + 1).padStart(2, "0");
+        const day = String(schedDate.getDate()).padStart(2, "0");
+        dateKey = `${year}-${month}-${day}`;
+      } else {
+        dateKey = post.date;
+      }
+
+      console.log(`Post ${post.id}: schedInfo =`, schedInfo, 'dateKey =', dateKey);
 
       if (!scheduleMap[dateKey]) {
         scheduleMap[dateKey] = [];
@@ -53,7 +86,10 @@ export function ContentPlanner() {
       });
     });
 
+    console.log('Final schedule map:', scheduleMap);
+    console.log('Total date keys:', Object.keys(scheduleMap).length);
     setSchedule(scheduleMap);
+    console.log('=== SCHEDULE LOADED ===');
   };
 
   const getDaysInMonth = (date: Date) => {

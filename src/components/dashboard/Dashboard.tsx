@@ -10,6 +10,7 @@ import {
 import { StatsCard } from "./StatsCard";
 import { RecentActivity } from "./RecentActivity";
 import { UpcomingPosts } from "./UpcomingPosts";
+import { ContentStatus } from "./ContentStatus";
 import { assetStorage, postsStorage, scheduledPostsStorage } from "@/lib/storage";
 
 export function Dashboard() {
@@ -121,6 +122,9 @@ export function Dashboard() {
           />
         </div>
       </motion.div>
+
+      {/* Content Status */}
+      <ContentStatus />
 
       {/* Bottom Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
